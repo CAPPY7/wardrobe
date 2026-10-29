@@ -177,8 +177,8 @@ export function WardrobeProvider({ children }) {
       });
       setJob("");
       await refresh();
-    } catch {
-      setJob("");
+    } catch (error) {
+      setJob(error?.message || "Tagging failed. Use Retry in Settings.");
       await db.items.update(id, { status: "pending_analysis" });
       await refresh();
     } finally {

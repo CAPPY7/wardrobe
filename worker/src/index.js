@@ -4,7 +4,7 @@
  * Allowed origins: the GitHub Pages site and local Vite.
  */
 
-const MODEL = "gemini-2.5-flash";
+const MODEL = "gemini-3.5-flash-lite";
 const MAX_BODY = 1_500_000;
 
 const ALLOWED_ORIGINS = new Set([

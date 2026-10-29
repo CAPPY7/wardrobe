@@ -58,9 +58,10 @@ export function sanitizeTags(raw, kindHint) {
   };
 }
 
-export async function analyzePhoto(workerUrl, jpegBlob, kindHint) {
-  const image = await blobToBase64(jpegBlob);
-  const raw = await post(workerUrl, "/analyze", { image, mimeType: "image/jpeg" });
+export async function analyzePhoto(workerUrl, blob, kindHint) {
+  const image = await blobToBase64(blob);
+  const mimeType = blob.type === "image/png" || blob.type === "image/webp" ? blob.type : "image/jpeg";
+  const raw = await post(workerUrl, "/analyze", { image, mimeType });
   return sanitizeTags(raw, kindHint);
 }
 
