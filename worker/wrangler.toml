@@ -1,0 +1,6 @@
+name = "wardrobe-proxy"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# GEMINI_API_KEY is a Worker secret. Never put it in this file.
+# Set it in the Cloudflare dashboard, or: npx wrangler secret put GEMINI_API_KEY

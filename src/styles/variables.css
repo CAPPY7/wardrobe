@@ -1,0 +1,32 @@
+:root {
+  color-scheme: light;
+  --paper: #f3eee6;
+  --card: #fffdf8;
+  --ink: #1c1916;
+  --muted: #6d655c;
+  --line: #e4dccf;
+  --accent: #1f4a3a;
+  --accent-ink: #f3eee6;
+  --warn: #8a5a12;
+  --danger: #8d2b2b;
+  --ok: #1f4a3a;
+  --shadow: 0 10px 30px rgb(28 25 22 / 8%);
+  --radius: 18px;
+  --font: "Segoe UI", "Avenir Next", sans-serif;
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --paper: #141210;
+    --card: #221e1a;
+    --ink: #f3eee6;
+    --muted: #b3aa9e;
+    --line: #3a342c;
+    --accent: #d7c4a3;
+    --accent-ink: #1c1916;
+    --shadow: 0 10px 30px rgb(0 0 0 / 35%);
+  }
+}

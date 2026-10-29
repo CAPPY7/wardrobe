@@ -1,0 +1,17 @@
+.hero { display: flex; justify-content: space-between; gap: 12px; align-items: end; }
+.weather strong { font-size: 2rem; letter-spacing: -0.04em; }
+.piece {
+  width: 72px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 10px;
+  background: var(--paper);
+}
+.outfit-photos { display: flex; gap: 8px; overflow-x: auto; }
+.slides { display: grid; gap: 14px; min-height: 60dvh; align-content: center; }
+.big { font-size: 1.4rem; margin: 0; }
+.detail-photo { width: 100%; border-radius: 18px; max-height: 70dvh; object-fit: contain; background: var(--paper); }
+@media (min-width: 800px) {
+  .snap { display: grid; grid-template-columns: repeat(3, 1fr); overflow: visible; }
+  .snap .card { min-width: 0; }
+}

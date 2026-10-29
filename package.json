@@ -1,0 +1,24 @@
+{
+  "name": "wardrobe",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "icons": "node scripts/make-icons.mjs",
+    "build": "node scripts/make-icons.mjs && vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "test": "node --test scripts/test-outfits.mjs"
+  },
+  "dependencies": {
+    "dexie": "^4.4.7",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.2",
+    "vite": "^8.3.5",
+    "vite-plugin-pwa": "^2.0.0"
+  }
+}
