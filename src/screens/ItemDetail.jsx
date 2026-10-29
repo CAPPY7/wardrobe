@@ -14,11 +14,13 @@ export default function ItemDetail() {
   const [name, setName] = useState("");
   const [typeName, setTypeName] = useState("");
   const [notes, setNotes] = useState("");
+  const [price, setPrice] = useState("");
   if (item && draftId !== item.id) {
     setDraftId(item.id);
     setName(item.name || "");
     setTypeName(item.type || "");
     setNotes(item.notes || "");
+    setPrice(item.price ? String(item.price) : "");
   }
   if (!wardrobe.booted) return <p>Opening…</p>;
   if (!item) return <p>That piece is gone.</p>;
@@ -29,15 +31,19 @@ export default function ItemDetail() {
   return (
     <section className="stack">
       <Link to="/closet">Back to closet</Link>
+      {item.needsSheet ? <div className="banner">The background is a room. <Link to="/add">Retake on a bedsheet</Link> for a clean cutout.</div> : null}
       <Photo className="detail-photo" blob={item.imageBlob || item.thumbBlob} alt={item.name} />
       <h1>{item.name}</h1>
       <p className="muted">
         Worn {item.timesWorn || 0} times
-        {item.lastWornAt ? ` · last ${new Date(item.lastWornAt).toLocaleDateString()}` : ""}
+        {item.price && item.timesWorn ? ` · ₹${Math.round(Number(item.price) / item.timesWorn)} a wear` : ""}
+        {item.lastWornAt ? ` · last ${new Date(item.lastWornAt).toLocaleDateString()}` : " · never worn"}
+        {item.laundry ? " · in the wash" : ""}
         {item.status === "pending_analysis" ? " · Waiting for tags" : ""}
         {item.status === "needs_review" ? " · Check tags" : ""}
         {item.advice ? ` · ${item.advice}` : ""}
       </p>
+      <Link className="btn primary" to={`/?with=${item.id}`}>Wear with this</Link>
       <input
         className="field"
         value={name}
@@ -59,6 +65,19 @@ export default function ItemDetail() {
           const next = typeName.trim() || "item";
           setTypeName(next);
           if (next !== item.type) patch({ type: next });
+        }}
+      />
+      <input
+        className="field"
+        value={price}
+        aria-label="Price"
+        inputMode="decimal"
+        placeholder="Price in ₹, optional"
+        onChange={(event) => setPrice(event.target.value)}
+        onBlur={() => {
+          const next = price.trim() === "" ? null : Number(price);
+          if (next !== null && !Number.isFinite(next)) return;
+          if (next !== (item.price ?? null)) patch({ price: next });
         }}
       />
       <input
@@ -115,9 +134,14 @@ export default function ItemDetail() {
           <Chip key={n} active={item.warmth === n} onClick={() => patch({ warmth: n })}>Warm {n}</Chip>
         ))}
       </div>
-      <Button variant="soft" onClick={() => patch({ favourite: !item.favourite })}>
-        {item.favourite ? "Favourited" : "Favourite"}
-      </Button>
+      <div className="row">
+        <Button variant="soft" onClick={() => patch({ laundry: !item.laundry })}>
+          {item.laundry ? "In the wash" : "Mark in laundry"}
+        </Button>
+        <Button variant="soft" onClick={() => patch({ favourite: !item.favourite })}>
+          {item.favourite ? "Favourited" : "Favourite"}
+        </Button>
+      </div>
       {confirm ? (
         <div className="row">
           <Button variant="danger" onClick={() => wardrobe.deleteItem(item.id).then(() => navigate("/closet"))}>Delete this piece</Button>

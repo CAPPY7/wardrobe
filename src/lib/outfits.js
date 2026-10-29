@@ -167,60 +167,101 @@ function missingLine(items, occasion) {
   return "";
 }
 
+function pin(list, locked, kinds) {
+  if (!locked || !kinds.includes(locked.kind)) return list;
+  return [locked, ...list.filter((item) => item.id !== locked.id)];
+}
+
 function buildCandidates(pool, ctx) {
-  const tops = topN(pool.filter((item) => item.kind === "top"), ctx, 6);
-  const bottoms = topN(pool.filter((item) => item.kind === "bottom"), ctx, 5);
-  const ethnic = topN(pool.filter((item) => item.kind === "ethnic"), ctx, 4);
-  const dresses = topN(pool.filter((item) => item.kind === "one_piece"), ctx, 4);
-  const shoes = topN(
-    pool.filter((item) => item.kind === "footwear" && !shoeBlocked(item, ctx.occasion)),
-    ctx,
-    4,
+  const locked = ctx.locked;
+  const tops = pin(topN(pool.filter((item) => item.kind === "top"), ctx, 6), locked, ["top"]);
+  const bottoms = pin(topN(pool.filter((item) => item.kind === "bottom"), ctx, 5), locked, ["bottom"]);
+  const ethnic = pin(topN(pool.filter((item) => item.kind === "ethnic"), ctx, 4), locked, ["ethnic"]);
+  const dresses = pin(topN(pool.filter((item) => item.kind === "one_piece"), ctx, 4), locked, ["one_piece"]);
+  const shoes = pin(
+    topN(
+      pool.filter((item) => item.kind === "footwear" && (!shoeBlocked(item, ctx.occasion) || item.id === locked?.id)),
+      ctx,
+      4,
+    ),
+    locked,
+    ["footwear"],
   );
-  const shoeFallback = shoes;
-  const layers = ctx.weather.temp <= 18 ? topN(pool.filter((item) => item.kind === "layer"), ctx, 2) : [];
-  const watches = topN(pool.filter((item) => item.kind === "watch"), ctx, 1);
+  const layerPool = ctx.weather.temp <= 18 || locked?.kind === "layer"
+    ? topN(pool.filter((item) => item.kind === "layer"), ctx, 2)
+    : [];
+  const layers = pin(layerPool, locked, ["layer"]);
+  const watches = pin(topN(pool.filter((item) => item.kind === "watch"), ctx, 1), locked, ["watch"]);
   const watch = watches[0] || null;
   const out = [];
 
   const push = (parts) => {
-    const bits = parts.filter(Boolean);
+    let bits = parts.filter(Boolean);
+    if (locked && !bits.some((item) => item.id === locked.id)) {
+      if (["accessory", "bag", "other", "watch"].includes(locked.kind)) bits = [...bits, locked];
+      else return;
+    }
     if (bits.length < 2) return;
+    const core = bits.find((item) => !locked || item.id !== locked.id) || bits[0];
     out.push({
       itemIds: bits.map((item) => item.id),
       items: bits,
       score: scoreOutfit(bits, ctx),
-      coreId: bits[0].id,
+      coreId: core.id,
       reason: explain(bits, ctx.weather, ctx.occasion),
     });
   };
 
   for (const top of tops) {
     for (const bottom of bottoms) {
-      if (!shoeFallback.length) push([top, bottom, layers[0], watch]);
-      for (const shoe of shoeFallback) push([top, bottom, shoe, layers[0], watch]);
+      if (!shoes.length) push([top, bottom, layers[0], watch]);
+      for (const shoe of shoes) push([top, bottom, shoe, layers[0], watch]);
     }
   }
   for (const piece of ethnic) {
     for (const bottom of bottoms) {
-      for (const shoe of shoeFallback.length ? shoeFallback : [null]) push([piece, bottom, shoe, watch]);
+      for (const shoe of shoes.length ? shoes : [null]) push([piece, bottom, shoe, watch]);
     }
   }
   for (const dress of dresses) {
-    for (const shoe of shoeFallback.length ? shoeFallback : [null]) push([dress, shoe, layers[0], watch]);
+    for (const shoe of shoes.length ? shoes : [null]) push([dress, shoe, layers[0], watch]);
   }
   return out;
 }
 
-export function suggest({ items, occasion, weather, wearLog = [], feedback = [], now = Date.now(), dayKey = "" }) {
+const REPORT = ["office", "casual_outing", "wedding_function", "gym_sports", "festival_puja", "travel", "formal_event"];
+
+export function closetReport(items, weather) {
+  return REPORT.map((occasion) => {
+    const result = suggest({ items, occasion, weather: weather || { temp: 28, rain: 0 }, dayKey: "report" });
+    let status = "Covered";
+    if (!result.outfits.length) status = "Missing";
+    else if (result.outfits.length < 2 || result.missing) status = "Thin";
+    return { occasion, status, count: result.outfits.length, missing: result.missing };
+  });
+}
+
+export function suggest({ items, occasion, weather, wearLog = [], feedback = [], now = Date.now(), dayKey = "", lockedId = null }) {
   const safeWeather = {
     temp: Number(weather?.temp ?? 28),
     feels: Number(weather?.feels ?? weather?.temp ?? 28),
     rain: Number(weather?.rain ?? 0),
   };
-  const ctx = { occasion, weather: safeWeather, wearLog, feedback, now, dayKey: dayKey || String(new Date(now).toDateString()) };
-  const pool = (items || []).filter((item) => eligible(item, occasion));
-  const missing = missingLine(items || [], occasion);
+  const all = items || [];
+  const locked = lockedId == null ? null : all.find((item) => item.id === lockedId) || null;
+  if (locked?.laundry) return { outfits: [], missing: "That piece is in the wash." };
+  const available = all.filter((item) => !item.laundry);
+  const ctx = {
+    occasion,
+    weather: safeWeather,
+    wearLog,
+    feedback,
+    now,
+    dayKey: dayKey || String(new Date(now).toDateString()),
+    locked,
+  };
+  const pool = available.filter((item) => eligible(item, occasion) || item.id === lockedId);
+  const missing = missingLine(available, occasion);
   const ranked = buildCandidates(pool, ctx).sort((a, b) => b.score - a.score);
   const picked = [];
   const used = new Set();

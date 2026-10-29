@@ -84,7 +84,88 @@ function trimAlpha(canvas) {
   return next;
 }
 
-/** Plain-background cutout. Returns the original canvas if the sheet is not plain enough. */
+function borderMedian(data, width, height) {
+  const samples = [];
+  const step = Math.max(1, Math.floor(Math.min(width, height) / 36));
+  for (let x = 0; x < width; x += step) {
+    samples.push([data[(1 * width + x) * 4], data[(1 * width + x) * 4 + 1], data[(1 * width + x) * 4 + 2]]);
+    const y = height - 2;
+    samples.push([data[(y * width + x) * 4], data[(y * width + x) * 4 + 1], data[(y * width + x) * 4 + 2]]);
+  }
+  for (let y = 0; y < height; y += step) {
+    samples.push([data[(y * width + 1) * 4], data[(y * width + 1) * 4 + 1], data[(y * width + 1) * 4 + 2]]);
+    const x = width - 2;
+    samples.push([data[(y * width + x) * 4], data[(y * width + x) * 4 + 1], data[(y * width + x) * 4 + 2]]);
+  }
+  const mid = (channel) => {
+    const values = samples.map((sample) => sample[channel]).sort((a, b) => a - b);
+    return values[Math.floor(values.length / 2)] || 0;
+  };
+  return [mid(0), mid(1), mid(2)];
+}
+
+/** Crop to the cloth when the photo is a room, not a plain sheet. */
+export function focusGarment(canvas) {
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const { width, height } = canvas;
+  const { data } = ctx.getImageData(0, 0, width, height);
+  const border = borderMedian(data, width, height);
+  const step = 3;
+  const cols = Math.ceil(width / step);
+  const rows = Math.ceil(height / step);
+  const mask = new Uint8Array(cols * rows);
+  for (let gy = 0; gy < rows; gy += 1) {
+    for (let gx = 0; gx < cols; gx += 1) {
+      const x = Math.min(width - 1, gx * step);
+      const y = Math.min(height - 1, gy * step);
+      const i = (y * width + x) * 4;
+      if (colorDist([data[i], data[i + 1], data[i + 2]], border) > 36) mask[gy * cols + gx] = 1;
+    }
+  }
+  const seen = new Uint8Array(mask.length);
+  let best = null;
+  for (let start = 0; start < mask.length; start += 1) {
+    if (!mask[start] || seen[start]) continue;
+    const stack = [start];
+    seen[start] = 1;
+    let count = 0;
+    let minX = cols;
+    let minY = rows;
+    let maxX = 0;
+    let maxY = 0;
+    while (stack.length) {
+      const cur = stack.pop();
+      count += 1;
+      const x = cur % cols;
+      const y = Math.floor(cur / cols);
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+      const nexts = [cur - 1, cur + 1, cur - cols, cur + cols];
+      for (const next of nexts) {
+        if (next < 0 || next >= mask.length || seen[next] || !mask[next]) continue;
+        if ((next === cur - 1 || next === cur + 1) && Math.floor(next / cols) !== y) continue;
+        seen[next] = 1;
+        stack.push(next);
+      }
+    }
+    if (!best || count > best.count) best = { count, minX, minY, maxX, maxY };
+  }
+  const total = cols * rows;
+  if (!best || best.count < total * 0.08 || best.count > total * 0.8) return { canvas, cropped: false };
+  const pad = step * 3;
+  const x = Math.max(0, best.minX * step - pad);
+  const y = Math.max(0, best.minY * step - pad);
+  const w = Math.min(width - x, (best.maxX - best.minX + 1) * step + pad * 2);
+  const h = Math.min(height - y, (best.maxY - best.minY + 1) * step + pad * 2);
+  if (w > width * 0.92 && h > height * 0.92) return { canvas, cropped: false };
+  const next = document.createElement("canvas");
+  next.width = Math.max(1, Math.round(w));
+  next.height = Math.max(1, Math.round(h));
+  next.getContext("2d").drawImage(canvas, x, y, w, h, 0, 0, next.width, next.height);
+  return { canvas: next, cropped: true };
+}
 export function knockOut(canvas) {
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   const { width, height } = canvas;
@@ -110,12 +191,17 @@ export function knockOut(canvas) {
 export async function preparePhoto(blob) {
   const image = await blobToImage(blob);
   const fitted = drawFit(image, 1024);
-  const cut = knockOut(fitted);
-  const cleaned = cut.canvas;
-  const thumb = drawFit(cleaned, 360);
-  const upload = drawFit(cleaned, 768);
-  const imageBlob = (await canvasToBlob(cleaned, "image/webp", 0.9)) || (await canvasToBlob(cleaned, "image/png"));
+  let cut = knockOut(fitted);
+  let canvas = cut.canvas;
+  if (!cut.removed) {
+    const focused = focusGarment(fitted);
+    cut = knockOut(focused.canvas);
+    canvas = cut.removed ? cut.canvas : focused.canvas;
+  }
+  const thumb = drawFit(canvas, 360);
+  const upload = drawFit(canvas, 768);
+  const imageBlob = (await canvasToBlob(canvas, "image/webp", 0.9)) || (await canvasToBlob(canvas, "image/png"));
   const thumbBlob = (await canvasToBlob(thumb, "image/webp", 0.82)) || (await canvasToBlob(thumb, "image/jpeg", 0.8));
   const jpegBlob = await canvasToBlob(upload, "image/jpeg", 0.8);
-  return { cleaned, imageBlob, thumbBlob, jpegBlob, removed: cut.removed };
+  return { cleaned: canvas, imageBlob, thumbBlob, jpegBlob, removed: cut.removed, needsSheet: !cut.removed };
 }

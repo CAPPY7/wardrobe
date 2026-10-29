@@ -158,10 +158,13 @@ export function WardrobeProvider({ children }) {
       advice: "",
       phash,
       cleaned: prepared.removed,
+      needsSheet: prepared.needsSheet,
+      laundry: false,
+      price: null,
     });
     await refresh();
     processItem(id);
-    return { id };
+    return { id, needsSheet: prepared.needsSheet };
   }
 
   async function processItem(id) {

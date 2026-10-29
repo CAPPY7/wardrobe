@@ -95,6 +95,18 @@ test("office does not suggest sneakers when loafers exist", () => {
   assert.equal(result.outfits.some((outfit) => outfit.items.some((piece) => piece.id === 7)), false);
 });
 
+test("a shirt in the wash is not suggested", () => {
+  const washed = closet.map((piece) => (piece.id === 1 ? { ...piece, laundry: true } : piece));
+  const result = suggest({ items: washed, occasion: "office", weather: { temp: 34, rain: 0 }, now, dayKey: day });
+  assert.equal(result.outfits.some((outfit) => outfit.items.some((piece) => piece.id === 1)), false);
+});
+
+test("wear with this keeps the chosen piece", () => {
+  const result = suggest({ items: closet, occasion: "office", weather: { temp: 34, rain: 0 }, now, dayKey: day, lockedId: 2 });
+  assert.ok(result.outfits.length > 0);
+  assert.ok(result.outfits.every((outfit) => outfit.items.some((piece) => piece.id === 2)));
+});
+
 test("missing shoes are called out", () => {
   const noShoes = closet.filter((piece) => piece.kind !== "footwear");
   const result = suggest({ items: noShoes, occasion: "office", weather: { temp: 28, rain: 0 }, now, dayKey: day });

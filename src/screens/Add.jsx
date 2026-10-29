@@ -16,6 +16,7 @@ export default function Add() {
   const [quick, setQuick] = useState(true);
   const [pendingDup, setPendingDup] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [sheetNote, setSheetNote] = useState("");
   const preview = useBlob(shot);
 
   useEffect(() => {
@@ -93,6 +94,7 @@ export default function Add() {
       }
       setPendingDup(null);
       setShot(null);
+      setSheetNote(result?.needsSheet ? "Saved a tighter crop. Retake on a bedsheet for a clean cutout." : "");
       if (!quick) setShoot(null);
     } catch (error) {
       setError(error?.message || "Could not save that photo.");
@@ -124,6 +126,7 @@ export default function Add() {
         <Button variant="soft" onClick={() => { setShoot(null); setShot(null); }}>Back</Button>
       </div>
       {error ? <div className="banner">{error}</div> : null}
+      {sheetNote ? <div className="banner">{sheetNote}</div> : null}
       {!shot ? (
         <div className="camera-wrap">
           <video ref={videoRef} playsInline muted autoPlay />

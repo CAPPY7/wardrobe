@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import OutfitCard from "../components/OutfitCard.jsx";
 import { Chip } from "../components/Bits.jsx";
-import { OCCASIONS } from "../lib/constants.js";
-import { suggest } from "../lib/outfits.js";
+import { OCCASIONS, OCCASION_MAP } from "../lib/constants.js";
+import { closetReport, suggest } from "../lib/outfits.js";
 import { stylistNote } from "../lib/ai.js";
 import { WORKER_URL } from "../lib/config.js";
 import { weatherFor, formatTemp } from "../lib/weather.js";
@@ -11,6 +11,9 @@ import { useWardrobe } from "../store.jsx";
 
 export default function Today() {
   const wardrobe = useWardrobe();
+  const [params] = useSearchParams();
+  const lockedId = Number(params.get("with")) || null;
+  const locked = wardrobe.items.find((item) => item.id === lockedId) || null;
   const [occasion, setOccasion] = useState("casual_outing");
   const [hidden, setHidden] = useState([]);
   const [worn, setWorn] = useState([]);
@@ -28,8 +31,14 @@ export default function Today() {
       wearLog: wardrobe.wearLog,
       feedback: wardrobe.feedback,
       dayKey,
+      lockedId,
     });
-  }, [wardrobe.booted, wardrobe.items, wardrobe.wearLog, wardrobe.feedback, occasion, weather.temp, weather.rain, dayKey]);
+  }, [wardrobe.booted, wardrobe.items, wardrobe.wearLog, wardrobe.feedback, occasion, weather.temp, weather.rain, dayKey, lockedId]);
+
+  const gaps = useMemo(
+    () => (wardrobe.booted ? closetReport(wardrobe.items, weather).filter((row) => row.status !== "Covered") : []),
+    [wardrobe.booted, wardrobe.items, weather.temp, weather.rain],
+  );
 
   const visible = result.outfits.filter((outfit) => !hidden.includes(outfit.itemIds.join("-")));
 
@@ -86,7 +95,19 @@ export default function Today() {
           <p className="muted">Or open Settings and load the sample closet.</p>
         </div>
       ) : null}
+      {locked ? (
+        <div className="banner">
+          Building around {locked.name}. <Link to="/">Clear</Link>
+        </div>
+      ) : null}
       {result.missing ? <div className="banner">{result.missing}</div> : null}
+      {!locked && gaps.length ? (
+        <p className="muted">
+          {gaps.slice(0, 3).map((row) => `${OCCASION_MAP[row.occasion]?.label || row.occasion} is ${row.status.toLowerCase()}`).join(" · ")}
+          {" · "}
+          <Link to="/history">Closet report</Link>
+        </p>
+      ) : null}
       <div className="snap">
         {visible.map((outfit, index) => (
           <OutfitCard
