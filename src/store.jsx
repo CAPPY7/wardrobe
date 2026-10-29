@@ -29,7 +29,7 @@ async function paintSample(label, hexColor) {
   ctx.font = "28px sans-serif";
   ctx.fillText(label, 40, 40);
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.85));
-  return blob;
+  return blob || new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 }
 
 const SAMPLES = [
@@ -96,11 +96,15 @@ export function WardrobeProvider({ children }) {
   }, [booted, settings?.lat, settings?.lon]);
 
   useEffect(() => {
-    if (!booted) return;
-    for (const item of items) {
-      if (item.status === "pending_analysis") processItem(item.id);
-    }
-  }, [booted]);
+    if (!booted || !online) return undefined;
+    let stop = false;
+    db.items.where("status").equals("pending_analysis").each((item) => {
+      if (!stop) processItem(item.id);
+    });
+    return () => {
+      stop = true;
+    };
+  }, [booted, online]);
 
   async function updateSettings(patch) {
     const next = { ...(settings || (await loadSettings())), ...patch, key: "app" };
@@ -112,8 +116,9 @@ export function WardrobeProvider({ children }) {
     return (settings?.workerUrl || WORKER_URL).replace(/\/$/, "");
   }
 
-  function findDuplicate(phash, kind, dominantHex) {
-    return items.find((item) => item.kind === kind && item.phash && hamming(item.phash, phash) <= 10 && hexDistance(item.dominantHex, dominantHex) < 48);
+  async function findDuplicate(phash, kind, dominantHex) {
+    const all = await db.items.toArray();
+    return all.find((item) => item.kind === kind && item.phash && hamming(item.phash, phash) <= 10 && hexDistance(item.dominantHex, dominantHex) < 48);
   }
 
   async function savePhoto({ blob, kind, force = false }) {
@@ -165,13 +170,20 @@ export function WardrobeProvider({ children }) {
     try {
       const item = await db.items.get(id);
       if (!item || item.status === "ready") return;
-      if (!online) return;
+      const photo = item.jpegBlob || item.imageBlob;
+      if (!photo) {
+        await db.items.update(id, { status: "needs_review", advice: "Photo missing. Delete this and shoot it again." });
+        await refresh();
+        return;
+      }
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
       setJob("Reading details...");
-      const tags = await analyzePhoto(workerUrl(), item.jpegBlob || item.imageBlob, item.kind);
-      const low = !tags.valid || tags.confidence < 0.6 || tags.usable === false;
+      const tags = await analyzePhoto(workerUrl(), photo, item.kind);
+      const { valid, usable, ...stored } = tags;
+      const low = !valid || tags.confidence < 0.6 || usable === false;
       await db.items.update(id, {
-        ...tags,
-        colors: tags.colors.length ? tags.colors : item.colors,
+        ...stored,
+        colors: stored.colors.length ? stored.colors : item.colors,
         status: low ? "needs_review" : "ready",
         jpegBlob: null,
       });
@@ -203,6 +215,11 @@ export function WardrobeProvider({ children }) {
   }
 
   async function wear(outfit, occasion, weatherSummary) {
+    const key = [...outfit.itemIds].map(String).sort().join("-");
+    const last = await db.wearLog.orderBy("id").reverse().first();
+    const lastKey = last ? [...(last.itemIds || [])].map(String).sort().join("-") : "";
+    const lastOutfit = last?.outfitId ? await db.outfits.get(last.outfitId) : null;
+    if (last && last.occasion === occasion && lastKey === key && Date.now() - (lastOutfit?.createdAt || 0) < 15000) return;
     const createdAt = Date.now();
     const outfitId = await db.outfits.add({
       createdAt,

@@ -15,6 +15,7 @@ export default function Add() {
   const [shot, setShot] = useState(null);
   const [quick, setQuick] = useState(true);
   const [pendingDup, setPendingDup] = useState(null);
+  const [busy, setBusy] = useState(false);
   const preview = useBlob(shot);
 
   useEffect(() => {
@@ -57,12 +58,20 @@ export default function Add() {
 
   async function capture() {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video?.videoWidth) {
+      setError("Camera is not ready yet.");
+      return;
+    }
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 720;
-    canvas.height = video.videoHeight || 960;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
     canvas.getContext("2d").drawImage(video, 0, 0);
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+    if (!blob) {
+      setError("Could not save that frame. Try Upload.");
+      return;
+    }
+    setError("");
     setShot(blob);
   }
 
@@ -73,14 +82,23 @@ export default function Add() {
   }
 
   async function usePhoto(force = false) {
-    const result = await savePhoto({ blob: shot, kind: shoot.kind, force });
-    if (result?.duplicate && !force) {
-      setPendingDup(result);
-      return;
+    if (!shot || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await savePhoto({ blob: shot, kind: shoot.kind, force });
+      if (result?.duplicate && !force) {
+        setPendingDup(result);
+        return;
+      }
+      setPendingDup(null);
+      setShot(null);
+      if (!quick) setShoot(null);
+    } catch (error) {
+      setError(error?.message || "Could not save that photo.");
+    } finally {
+      setBusy(false);
     }
-    setPendingDup(null);
-    setShot(null);
-    if (!quick) setShoot(null);
   }
 
   if (!shoot) {
@@ -90,7 +108,7 @@ export default function Add() {
         <p className="muted">{SHOOT_ALWAYS}</p>
         <div className="grid">
           {SHOOTS.map((item) => (
-            <button key={item.id} className="card" onClick={() => setShoot(item)}>
+            <button key={item.id} type="button" className="card" onClick={() => setShoot(item)}>
               <strong>{item.label}</strong>
             </button>
           ))}
@@ -126,18 +144,26 @@ export default function Add() {
       </label>
       <div className="row">
         {!shot ? (
-          <Button onClick={capture} disabled={meter?.tooDark}>
+          <Button onClick={capture} disabled={!meter || meter.tooDark}>
             Shutter
           </Button>
         ) : (
           <>
-            <Button onClick={() => usePhoto(false)}>Use photo</Button>
-            <Button variant="soft" onClick={() => setShot(null)}>Retake</Button>
+            <Button onClick={() => usePhoto(false)} disabled={busy}>{busy ? "Saving…" : "Use photo"}</Button>
+            <Button variant="soft" onClick={() => setShot(null)} disabled={busy}>Retake</Button>
           </>
         )}
         <label className="btn soft">
           Upload
-          <input hidden type="file" accept="image/*" capture="environment" onChange={(event) => useFile(event.target.files?.[0])} />
+          <input
+            hidden
+            type="file"
+            accept="image/*"
+            onChange={(event) => {
+              useFile(event.target.files?.[0]);
+              event.target.value = "";
+            }}
+          />
         </label>
       </div>
       <Link to="/closet">Review closet</Link>

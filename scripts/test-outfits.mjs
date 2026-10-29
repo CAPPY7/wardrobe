@@ -90,6 +90,11 @@ test("three outfits use different core pieces when the closet allows it", () => 
   assert.ok(cores.length >= 2);
 });
 
+test("office does not suggest sneakers when loafers exist", () => {
+  const result = suggest({ items: closet, occasion: "office", weather: { temp: 26, rain: 0 }, now, dayKey: day });
+  assert.equal(result.outfits.some((outfit) => outfit.items.some((piece) => piece.id === 7)), false);
+});
+
 test("missing shoes are called out", () => {
   const noShoes = closet.filter((piece) => piece.kind !== "footwear");
   const result = suggest({ items: noShoes, occasion: "office", weather: { temp: 28, rain: 0 }, now, dayKey: day });

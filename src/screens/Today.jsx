@@ -6,14 +6,16 @@ import { OCCASIONS } from "../lib/constants.js";
 import { suggest } from "../lib/outfits.js";
 import { stylistNote } from "../lib/ai.js";
 import { WORKER_URL } from "../lib/config.js";
-import { weatherFor } from "../lib/weather.js";
+import { weatherFor, formatTemp } from "../lib/weather.js";
 import { useWardrobe } from "../store.jsx";
 
 export default function Today() {
   const wardrobe = useWardrobe();
   const [occasion, setOccasion] = useState("casual_outing");
   const [hidden, setHidden] = useState([]);
+  const [worn, setWorn] = useState([]);
   const [note, setNote] = useState("");
+  const units = wardrobe.settings?.units || "C";
   const weather = weatherFor(wardrobe.settings || {}, wardrobe.online);
   const dayKey = new Date().toDateString();
 
@@ -32,14 +34,14 @@ export default function Today() {
   const visible = result.outfits.filter((outfit) => !hidden.includes(outfit.itemIds.join("-")));
 
   useEffect(() => {
-    const first = visible[0];
-    if (!first || !wardrobe.settings?.aiNoteEnabled || !wardrobe.online) {
+    const key = visible[0]?.itemIds.join("-") || "";
+    if (!key || !wardrobe.settings?.aiNoteEnabled || !wardrobe.online) {
       setNote("");
       return undefined;
     }
     let stop = false;
     const url = (wardrobe.settings.workerUrl || WORKER_URL).replace(/\/$/, "");
-    stylistNote(url, first, { occasion, weather: { temp: weather.temp, rain: weather.rain } })
+    stylistNote(url, visible[0], { occasion, weather: { temp: weather.temp, rain: weather.rain } })
       .then((text) => {
         if (!stop) setNote(text);
       })
@@ -49,7 +51,7 @@ export default function Today() {
     return () => {
       stop = true;
     };
-  }, [visible[0]?.itemIds.join("-"), occasion, wardrobe.online]);
+  }, [visible[0]?.itemIds.join("-"), occasion, wardrobe.online, wardrobe.settings?.aiNoteEnabled, weather.temp, weather.rain]);
 
   return (
     <section className="stack">
@@ -63,9 +65,9 @@ export default function Today() {
         </Link>
       </div>
       <article className="card weather">
-        <strong>{Math.round(weather.temp)}°C</strong>
+        <strong>{formatTemp(weather.temp, units)}</strong>
         <p className="muted">
-          Feels {Math.round(weather.feels)}° · rain {Math.round(weather.rain)}% · {weather.text}
+          Feels {formatTemp(weather.feels, units)} · rain {Math.round(weather.rain)}% · {weather.text}
           {weather.offline ? " · offline" : ""}
           {wardrobe.settings?.locationName ? ` · ${wardrobe.settings.locationName}` : ""}
         </p>
@@ -91,7 +93,13 @@ export default function Today() {
             key={outfit.itemIds.join("-")}
             outfit={outfit}
             note={index === 0 && note ? note : outfit.reason}
-            onWear={() => wardrobe.wear(outfit, occasion, `${Math.round(weather.temp)}C`)}
+            worn={worn.includes(outfit.itemIds.join("-"))}
+            onWear={() => {
+              const key = outfit.itemIds.join("-");
+              if (worn.includes(key)) return;
+              setWorn((list) => [...list, key]);
+              wardrobe.wear(outfit, occasion, formatTemp(weather.temp, units));
+            }}
             onSkip={() => {
               wardrobe.feedbackOn(outfit.itemIds, "skip");
               setHidden((list) => [...list, outfit.itemIds.join("-")]);

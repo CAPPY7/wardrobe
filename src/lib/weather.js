@@ -52,6 +52,13 @@ export function weatherFor(settings, online) {
   return { temp: 28, feels: 28, rain: 10, text: "Mild day until you set a city", offline: !online, placeholder: true };
 }
 
+export function formatTemp(celsius, units) {
+  const value = Number(celsius);
+  if (!Number.isFinite(value)) return "--";
+  if (units === "F") return `${Math.round((value * 9) / 5 + 32)}°F`;
+  return `${Math.round(value)}°C`;
+}
+
 export function readPosition() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {

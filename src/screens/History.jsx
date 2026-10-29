@@ -3,8 +3,9 @@ import { Photo } from "../components/Bits.jsx";
 import { useWardrobe } from "../store.jsx";
 
 export default function History() {
-  const { wearLog, items, feedback, outfits } = useWardrobe();
+  const { wearLog, items, feedback } = useWardrobe();
   const liked = feedback.filter((row) => row.verdict === "like");
+  const names = (ids) => ids.map((id) => items.find((row) => String(row.id) === String(id))?.name).filter(Boolean).join(" + ");
   return (
     <section className="stack">
       <h1>History</h1>
@@ -25,8 +26,7 @@ export default function History() {
       {liked.length === 0 ? <p className="muted">Hearts you tap show up here.</p> : null}
       {liked.map((row) => (
         <p key={row.id} className="muted">
-          {row.comboKey} · {new Date(row.at).toLocaleDateString()}
-          {outfits.length ? "" : ""}
+          {names(String(row.comboKey).split("-")) || "Removed pieces"} · {row.at ? new Date(row.at).toLocaleDateString() : ""}
         </p>
       ))}
     </section>

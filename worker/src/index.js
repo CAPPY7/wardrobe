@@ -144,6 +144,7 @@ function cleanAnalyze(raw) {
   const materialSet = new Set(["cotton", "denim", "linen", "wool", "leather", "synthetic", "silk", "knit", "unknown"]);
   const seasonSet = new Set(["summer", "monsoon", "winter", "all"]);
   const kind = kindSet.has(raw.kind) ? raw.kind : "other";
+  const seasons = (Array.isArray(raw.seasons) ? raw.seasons : ["all"]).filter((s) => seasonSet.has(s)).slice(0, 4);
   return {
     quality: {
       usable: Boolean(raw.quality?.usable),
@@ -156,7 +157,7 @@ function cleanAnalyze(raw) {
     colors: Array.isArray(raw.colors) ? raw.colors.map(String).slice(0, 3) : [],
     pattern: patternSet.has(raw.pattern) ? raw.pattern : "other",
     material: materialSet.has(raw.material) ? raw.material : "unknown",
-    seasons: (Array.isArray(raw.seasons) ? raw.seasons : ["all"]).filter((s) => seasonSet.has(s)).slice(0, 4),
+    seasons: seasons.length ? seasons : ["all"],
     formality: clampInt(raw.formality, 1, 5, 3),
     warmth: clampInt(raw.warmth, 1, 5, 3),
     occasions: (Array.isArray(raw.occasions) ? raw.occasions : []).filter((key) => OCCASIONS.includes(key)),

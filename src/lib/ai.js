@@ -26,11 +26,15 @@ async function post(workerUrl, path, body) {
         continue;
       }
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || "AI is unavailable.");
+      if (!response.ok) {
+        const error = new Error(payload.error || "AI is unavailable.");
+        error.fatal = true;
+        throw error;
+      }
       return payload;
     } catch (error) {
       lastError = error;
-      if (attempt === 2) break;
+      if (error.fatal || attempt === 2) break;
       await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1)));
     }
   }
@@ -40,14 +44,15 @@ async function post(workerUrl, path, body) {
 export function sanitizeTags(raw, kindHint) {
   const kind = KINDS.includes(raw?.kind) ? raw.kind : kindHint || "other";
   const confidence = Math.min(1, Math.max(0, Number(raw?.confidence) || 0));
+  const seasons = (Array.isArray(raw?.seasons) ? raw.seasons : ["all"]).filter((s) => SEASONS.includes(s));
   return {
-    kind,
+    kind: confidence < 0.6 && kindHint ? kindHint : kind,
     type: String(raw?.type || "item").slice(0, 60),
     name: String(raw?.name || "New item").slice(0, 80),
     colors: Array.isArray(raw?.colors) && raw.colors.length ? raw.colors.map(String).slice(0, 3) : [],
     pattern: PATTERNS.includes(raw?.pattern) ? raw.pattern : "other",
     material: MATERIALS.includes(raw?.material) ? raw.material : "unknown",
-    seasons: (Array.isArray(raw?.seasons) ? raw.seasons : ["all"]).filter((s) => SEASONS.includes(s)),
+    seasons: seasons.length ? seasons : ["all"],
     formality: Math.min(5, Math.max(1, Math.round(Number(raw?.formality) || 3))),
     warmth: Math.min(5, Math.max(1, Math.round(Number(raw?.warmth) || 3))),
     occasions: (Array.isArray(raw?.occasions) ? raw.occasions : []).filter((key) => OCCASION_KEYS.has(key)),

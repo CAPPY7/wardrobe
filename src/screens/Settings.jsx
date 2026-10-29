@@ -67,6 +67,8 @@ export default function Settings() {
               {mode}
             </Chip>
           ))}
+          <Chip active={settings.units !== "F"} onClick={() => wardrobe.updateSettings({ units: "C" })}>°C</Chip>
+          <Chip active={settings.units === "F"} onClick={() => wardrobe.updateSettings({ units: "F" })}>°F</Chip>
         </div>
       </article>
       <article className="card stack">

@@ -1,6 +1,6 @@
 import { Photo, Button } from "./Bits.jsx";
 
-export default function OutfitCard({ outfit, note, onWear, onSkip, onLike }) {
+export default function OutfitCard({ outfit, note, onWear, onSkip, onLike, worn }) {
   return (
     <article className="card stack">
       <div className="outfit-photos">
@@ -13,7 +13,7 @@ export default function OutfitCard({ outfit, note, onWear, onSkip, onLike }) {
         <p className="muted">{note || outfit.reason}</p>
       </div>
       <div className="row">
-        <Button onClick={onWear}>Wear this</Button>
+        <Button onClick={onWear} disabled={worn}>{worn ? "Worn" : "Wear this"}</Button>
         <Button variant="soft" onClick={onSkip}>Skip</Button>
         <Button variant="soft" onClick={onLike}>Heart</Button>
       </div>

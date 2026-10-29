@@ -51,7 +51,7 @@ function shoeBlocked(shoe, occasion) {
   const type = `${shoe.type || ""} ${shoe.name || ""}`.toLowerCase();
   const sporty = /sneaker|trainer|sport|running/.test(type);
   const formal = /loafer|oxford|formal|heel|derby/.test(type);
-  if ((occasion === "formal_event" || occasion === "wedding_function") && sporty) return true;
+  if ((occasion === "office" || occasion === "formal_event" || occasion === "wedding_function") && sporty) return true;
   if (occasion === "gym_sports" && formal && !sporty) return true;
   return false;
 }
@@ -177,7 +177,7 @@ function buildCandidates(pool, ctx) {
     ctx,
     4,
   );
-  const shoeFallback = shoes.length ? shoes : topN(pool.filter((item) => item.kind === "footwear"), ctx, 3);
+  const shoeFallback = shoes;
   const layers = ctx.weather.temp <= 18 ? topN(pool.filter((item) => item.kind === "layer"), ctx, 2) : [];
   const watches = topN(pool.filter((item) => item.kind === "watch"), ctx, 1);
   const watch = watches[0] || null;
@@ -230,5 +230,6 @@ export function suggest({ items, occasion, weather, wearLog = [], feedback = [],
     picked.push(outfit);
     if (picked.length === 3) break;
   }
-  return { outfits: picked, missing: picked.length ? missing && !picked.some((o) => o.items.some((i) => i.kind === "footwear")) ? missing : (picked.length ? "" : missing) : missing };
+  const hasShoes = picked.some((outfit) => outfit.items.some((item) => item.kind === "footwear"));
+  return { outfits: picked, missing: picked.length && hasShoes ? "" : missing };
 }

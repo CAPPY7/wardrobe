@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button, Chip, Photo } from "../components/Bits.jsx";
-import { KIND_LABEL, KINDS, MATERIALS, OCCASIONS, PATTERNS, SEASONS } from "../lib/constants.js";
+import { COLOR_NAMES, KIND_LABEL, KINDS, MATERIALS, OCCASIONS, PATTERNS, SEASONS } from "../lib/constants.js";
 import { useWardrobe } from "../store.jsx";
 
 export default function ItemDetail() {
@@ -10,23 +10,74 @@ export default function ItemDetail() {
   const wardrobe = useWardrobe();
   const item = wardrobe.items.find((row) => String(row.id) === id);
   const [confirm, setConfirm] = useState(false);
+  const [draftId, setDraftId] = useState(null);
+  const [name, setName] = useState("");
+  const [typeName, setTypeName] = useState("");
+  const [notes, setNotes] = useState("");
+  if (item && draftId !== item.id) {
+    setDraftId(item.id);
+    setName(item.name || "");
+    setTypeName(item.type || "");
+    setNotes(item.notes || "");
+  }
   if (!wardrobe.booted) return <p>Opening…</p>;
   if (!item) return <p>That piece is gone.</p>;
 
   const patch = (next) => wardrobe.updateItem(item.id, next);
-  const toggle = (list, value) => (list || []).includes(value) ? (list || []).filter((v) => v !== value) : [...(list || []), value];
+  const toggle = (list, value) => ((list || []).includes(value) ? (list || []).filter((v) => v !== value) : [...(list || []), value]);
 
   return (
     <section className="stack">
+      <Link to="/closet">Back to closet</Link>
       <Photo className="detail-photo" blob={item.imageBlob || item.thumbBlob} alt={item.name} />
       <h1>{item.name}</h1>
       <p className="muted">
         Worn {item.timesWorn || 0} times
         {item.lastWornAt ? ` · last ${new Date(item.lastWornAt).toLocaleDateString()}` : ""}
+        {item.status === "pending_analysis" ? " · Waiting for tags" : ""}
         {item.status === "needs_review" ? " · Check tags" : ""}
         {item.advice ? ` · ${item.advice}` : ""}
       </p>
-      <input className="field" value={item.name} onChange={(event) => patch({ name: event.target.value, status: "ready" })} />
+      <input
+        className="field"
+        value={name}
+        aria-label="Name"
+        onChange={(event) => setName(event.target.value)}
+        onBlur={() => {
+          const next = name.trim() || item.name;
+          setName(next);
+          if (next !== item.name) patch({ name: next, status: "ready" });
+        }}
+      />
+      <input
+        className="field"
+        value={typeName}
+        aria-label="Type"
+        placeholder="Type, such as shirt, kurta, sneakers"
+        onChange={(event) => setTypeName(event.target.value)}
+        onBlur={() => {
+          const next = typeName.trim() || "item";
+          setTypeName(next);
+          if (next !== item.type) patch({ type: next });
+        }}
+      />
+      <input
+        className="field"
+        value={notes}
+        aria-label="Notes"
+        placeholder="Notes"
+        onChange={(event) => setNotes(event.target.value)}
+        onBlur={() => {
+          if (notes !== (item.notes || "")) patch({ notes });
+        }}
+      />
+      <div className="row">
+        {COLOR_NAMES.map(([color]) => (
+          <Chip key={color} active={(item.colors || []).map((name) => name.toLowerCase()).includes(color)} onClick={() => patch({ colors: toggle((item.colors || []).map((name) => name.toLowerCase()), color).slice(0, 3), status: "ready" })}>
+            {color}
+          </Chip>
+        ))}
+      </div>
       <div className="row">
         {KINDS.map((kind) => (
           <Chip key={kind} active={item.kind === kind} onClick={() => patch({ kind, status: "ready" })}>{KIND_LABEL[kind]}</Chip>
